@@ -20,7 +20,8 @@ public class SecurityConfig {
                         .pathMatchers(
                                 "/merchants/register",
                                 "/auth/token",
-                                "/actuator/**"
+                                "/actuator/health",
+                                "/error"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )

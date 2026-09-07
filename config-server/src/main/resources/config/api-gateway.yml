@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: merchant-service
+              uri: lb://merchant-service
+              predicates:
+                - Path=/merchants/**
+
+            - id: auth-service
+              uri: lb://merchant-service
+              predicates:
+                - Path=/auth/**
+
+server:
+  port: 8080
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
