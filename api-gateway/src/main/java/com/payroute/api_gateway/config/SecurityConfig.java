@@ -19,7 +19,8 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(
                                 "/merchants/register",
-                                "/auth/token"
+                                "/auth/token",
+                                "/actuator/**"
                         ).permitAll()
                         .anyExchange().authenticated()
                 )

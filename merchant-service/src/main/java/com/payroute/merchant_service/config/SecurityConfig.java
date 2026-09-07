@@ -32,7 +32,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/merchants/register",
-                                "/auth/token"
+                                "/auth/token",
+                                "/actuator/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
