@@ -3,6 +3,7 @@ package com.example.payment_service.dto.request;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -24,5 +25,6 @@ public class CreatePaymentRequest {
     private BigDecimal amount;
 
     @NotBlank(message = "currency is required")
+    @Size(min = 3, max = 3, message = "currency must be exactly 3 characters")
     private String currency;
 }
