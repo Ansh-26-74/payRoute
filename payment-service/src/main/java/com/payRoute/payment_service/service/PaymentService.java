@@ -43,7 +43,8 @@ public class PaymentService {
 
         PaymentResponse cachedResponse = idempotencyCacheService.get(
                 request.getMerchantId(),
-                idempotencyKey
+                idempotencyKey,
+                requestHash
         );
 
         if (cachedResponse != null) {
@@ -73,6 +74,7 @@ public class PaymentService {
             idempotencyCacheService.put(
                     request.getMerchantId(),
                     idempotencyKey,
+                    requestHash,
                     response
             );
 
@@ -91,6 +93,7 @@ public class PaymentService {
             idempotencyCacheService.put(
                     request.getMerchantId(),
                     idempotencyKey,
+                    requestHash,
                     response
             );
 
@@ -115,6 +118,7 @@ public class PaymentService {
             idempotencyCacheService.put(
                     request.getMerchantId(),
                     idempotencyKey,
+                    requestHash,
                     response
             );
 

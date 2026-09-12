@@ -1,6 +1,8 @@
 package com.payRoute.payment_service.service;
 
+import com.payRoute.payment_service.dto.response.IdempotencyCacheEntry;
 import com.payRoute.payment_service.dto.response.PaymentResponse;
+import com.payRoute.payment_service.exception.IdempotencyKeyConflictException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -14,16 +16,33 @@ public class IdempotencyCacheService {
 
     private static final Duration CACHE_TTL = Duration.ofHours(24);
 
-    private final RedisTemplate<String, PaymentResponse> redisTemplate;
+    private final RedisTemplate<String, IdempotencyCacheEntry> redisTemplate;
 
     public PaymentResponse get(
             UUID merchantId,
-            String idempotencyKey) {
+            String idempotencyKey,
+            String requestHash) {
 
         String key = buildKey(merchantId, idempotencyKey);
 
         try {
-            return redisTemplate.opsForValue().get(key);
+            IdempotencyCacheEntry cachedEntry =
+                    redisTemplate.opsForValue().get(key);
+
+            if (cachedEntry == null) {
+                return null;
+            }
+
+            if (!cachedEntry.getRequestHash().equals(requestHash)) {
+                throw new IdempotencyKeyConflictException(
+                        "Idempotency key was already used with a different request"
+                );
+            }
+
+            return cachedEntry.getResponse();
+
+        } catch (IdempotencyKeyConflictException ex) {
+            throw ex;
         } catch (Exception ex) {
             return null;
         }
@@ -32,16 +51,24 @@ public class IdempotencyCacheService {
     public void put(
             UUID merchantId,
             String idempotencyKey,
+            String requestHash,
             PaymentResponse response) {
 
         String key = buildKey(merchantId, idempotencyKey);
 
         try {
+            IdempotencyCacheEntry cacheEntry =
+                    IdempotencyCacheEntry.builder()
+                            .requestHash(requestHash)
+                            .response(response)
+                            .build();
+
             redisTemplate.opsForValue().set(
                     key,
-                    response,
+                    cacheEntry,
                     CACHE_TTL
             );
+
         } catch (Exception ignored) {
         }
     }
@@ -50,7 +77,7 @@ public class IdempotencyCacheService {
             UUID merchantId,
             String idempotencyKey) {
 
-        return "idempotency:"
+        return "idempotency:v2:"
                 + merchantId
                 + ":"
                 + idempotencyKey;
