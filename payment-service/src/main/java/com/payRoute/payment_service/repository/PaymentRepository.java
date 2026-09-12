@@ -1,6 +1,6 @@
-package com.example.payment_service.repository;
+package com.payRoute.payment_service.repository;
 
-import com.example.payment_service.entity.Payment;
+import com.payRoute.payment_service.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;

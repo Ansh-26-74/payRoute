@@ -1,4 +1,4 @@
-package com.example.payment_service.dto.response;
+package com.payRoute.payment_service.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

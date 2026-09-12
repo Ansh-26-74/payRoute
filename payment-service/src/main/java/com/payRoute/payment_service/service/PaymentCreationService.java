@@ -1,10 +1,10 @@
-package com.example.payment_service.service;
+package com.payRoute.payment_service.service;
 
-import com.example.payment_service.dto.request.CreatePaymentRequest;
-import com.example.payment_service.entity.IdempotencyRecord;
-import com.example.payment_service.entity.Payment;
-import com.example.payment_service.repository.IdempotencyRecordRepository;
-import com.example.payment_service.repository.PaymentRepository;
+import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.entity.IdempotencyRecord;
+import com.payRoute.payment_service.entity.Payment;
+import com.payRoute.payment_service.repository.IdempotencyRecordRepository;
+import com.payRoute.payment_service.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;

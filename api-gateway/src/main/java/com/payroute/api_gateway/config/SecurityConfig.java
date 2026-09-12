@@ -21,6 +21,7 @@ public class SecurityConfig {
                                 "/merchants/register",
                                 "/auth/token",
                                 "/actuator/health",
+                                "/payments/**",
                                 "/error"
                         ).permitAll()
                         .anyExchange().authenticated()

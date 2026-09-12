@@ -1,8 +1,8 @@
-package com.example.payment_service.controller;
+package com.payRoute.payment_service.controller;
 
-import com.example.payment_service.dto.request.CreatePaymentRequest;
-import com.example.payment_service.dto.response.PaymentResponse;
-import com.example.payment_service.service.PaymentService;
+import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.dto.response.PaymentResponse;
+import com.payRoute.payment_service.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping("/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 

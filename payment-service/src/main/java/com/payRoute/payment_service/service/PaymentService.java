@@ -1,12 +1,12 @@
-package com.example.payment_service.service;
+package com.payRoute.payment_service.service;
 
-import com.example.payment_service.dto.request.CreatePaymentRequest;
-import com.example.payment_service.dto.response.PaymentResponse;
-import com.example.payment_service.entity.IdempotencyRecord;
-import com.example.payment_service.entity.Payment;
-import com.example.payment_service.exception.IdempotencyKeyConflictException;
-import com.example.payment_service.repository.IdempotencyRecordRepository;
-import com.example.payment_service.repository.PaymentRepository;
+import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.dto.response.PaymentResponse;
+import com.payRoute.payment_service.entity.IdempotencyRecord;
+import com.payRoute.payment_service.entity.Payment;
+import com.payRoute.payment_service.exception.IdempotencyKeyConflictException;
+import com.payRoute.payment_service.repository.IdempotencyRecordRepository;
+import com.payRoute.payment_service.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -21,6 +21,7 @@ public class PaymentService {
     private final IdempotencyRecordRepository idempotencyRecordRepository;
     private final RequestHashService requestHashService;
     private final PaymentCreationService paymentCreationService;
+    private final IdempotencyCacheService idempotencyCacheService;
 
     public PaymentResponse createPayment(
             CreatePaymentRequest request,
@@ -33,10 +34,27 @@ public class PaymentService {
         idempotencyKey = idempotencyKey.trim();
 
         if (idempotencyKey.length() > 100) {
-            throw new IllegalArgumentException("Idempotency-Key must not exceed 100 characters");
+            throw new IllegalArgumentException(
+                    "Idempotency-Key must not exceed 100 characters"
+            );
         }
 
         String requestHash = requestHashService.generateHash(request);
+
+        PaymentResponse cachedResponse = idempotencyCacheService.get(
+                request.getMerchantId(),
+                idempotencyKey
+        );
+
+        if (cachedResponse != null) {
+
+            Optional<Payment> cachedPayment =
+                    paymentRepository.findById(cachedResponse.getPaymentId());
+
+            if (cachedPayment.isPresent()) {
+                return toPaymentResponse(cachedPayment.get());
+            }
+        }
 
         Optional<IdempotencyRecord> existingRecord =
                 idempotencyRecordRepository.findByMerchantIdAndIdempotencyKey(
@@ -45,7 +63,20 @@ public class PaymentService {
                 );
 
         if (existingRecord.isPresent()) {
-            return handleExistingRecord(existingRecord.get(), requestHash);
+
+            PaymentResponse response =
+                    handleExistingRecord(
+                            existingRecord.get(),
+                            requestHash
+                    );
+
+            idempotencyCacheService.put(
+                    request.getMerchantId(),
+                    idempotencyKey,
+                    response
+            );
+
+            return response;
         }
 
         try {
@@ -55,7 +86,15 @@ public class PaymentService {
                     requestHash
             );
 
-            return toPaymentResponse(payment);
+            PaymentResponse response = toPaymentResponse(payment);
+
+            idempotencyCacheService.put(
+                    request.getMerchantId(),
+                    idempotencyKey,
+                    response
+            );
+
+            return response;
 
         } catch (DataIntegrityViolationException ex) {
 
@@ -67,7 +106,19 @@ public class PaymentService {
                             )
                             .orElseThrow(() -> ex);
 
-            return handleExistingRecord(concurrentRecord, requestHash);
+            PaymentResponse response =
+                    handleExistingRecord(
+                            concurrentRecord,
+                            requestHash
+                    );
+
+            idempotencyCacheService.put(
+                    request.getMerchantId(),
+                    idempotencyKey,
+                    response
+            );
+
+            return response;
         }
     }
 

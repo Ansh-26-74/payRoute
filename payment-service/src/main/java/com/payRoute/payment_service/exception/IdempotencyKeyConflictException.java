@@ -1,4 +1,4 @@
-package com.example.payment_service.exception;
+package com.payRoute.payment_service.exception;
 
 public class IdempotencyKeyConflictException extends RuntimeException {
 

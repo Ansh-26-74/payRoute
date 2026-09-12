@@ -1,6 +1,6 @@
-package com.example.payment_service.service;
+package com.payRoute.payment_service.service;
 
-import com.example.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;

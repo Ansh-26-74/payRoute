@@ -1,4 +1,4 @@
-package com.example.payment_service.entity;
+package com.payRoute.payment_service.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
