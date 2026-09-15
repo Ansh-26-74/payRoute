@@ -40,6 +40,7 @@ public class OrchestrationService {
         );
 
         return OrchestrationResponse.builder()
+                .paymentId(request.getPaymentId())
                 .status(gatewayResponse.status())
                 .gatewayUsed("SIM_GATEWAY")
                 .declineReason(gatewayResponse.declineReason())

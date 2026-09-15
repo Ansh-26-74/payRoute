@@ -1,12 +1,14 @@
-package com.payroute.orchestration_service.dto.response;
+package com.payRoute.payment_service.dto.response;
 
-import lombok.Builder;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
 @Getter
-@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrchestrationResponse {
 
     private UUID paymentId;

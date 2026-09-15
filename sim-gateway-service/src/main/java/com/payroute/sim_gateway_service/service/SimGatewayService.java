@@ -25,7 +25,7 @@ public class SimGatewayService {
         }
 
         return ChargeResponse.builder()
-                .status("DECLINED")
+                .status("FAILED")
                 .declineReason(configuration.getDeclineReason())
                 .build();
     }

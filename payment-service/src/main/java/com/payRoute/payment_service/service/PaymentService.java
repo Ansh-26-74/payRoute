@@ -1,9 +1,11 @@
 package com.payRoute.payment_service.service;
 
 import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.dto.response.OrchestrationResponse;
 import com.payRoute.payment_service.dto.response.PaymentResponse;
 import com.payRoute.payment_service.entity.IdempotencyRecord;
 import com.payRoute.payment_service.entity.Payment;
+import com.payRoute.payment_service.entity.PaymentStatus;
 import com.payRoute.payment_service.exception.IdempotencyKeyConflictException;
 import com.payRoute.payment_service.exception.ResourceNotFoundException;
 import com.payRoute.payment_service.repository.IdempotencyRecordRepository;
@@ -93,16 +95,19 @@ public class PaymentService {
                     requestHash
             );
 
-            PaymentResponse response = toPaymentResponse(payment);
+            OrchestrationResponse orchestrationResponse =
+                    orchestrationServiceClient.orchestrate(
+                            OrchestratePaymentRequest.builder()
+                                    .paymentId(payment.getPaymentId())
+                                    .merchantId(payment.getMerchantId())
+                                    .amount(payment.getAmount())
+                                    .currency(payment.getCurrency())
+                                    .build()
+                    );
 
-            orchestrationServiceClient.orchestrate(
-                    OrchestratePaymentRequest.builder()
-                            .paymentId(payment.getPaymentId())
-                            .merchantId(payment.getMerchantId())
-                            .amount(payment.getAmount())
-                            .currency(payment.getCurrency())
-                            .build()
-            );
+            updatePaymentStatus(payment, orchestrationResponse);
+
+            PaymentResponse response = toPaymentResponse(payment);
 
             idempotencyCacheService.put(
                     request.getMerchantId(),
@@ -138,6 +143,17 @@ public class PaymentService {
 
             return response;
         }
+    }
+
+    private void updatePaymentStatus(
+            Payment payment,
+            OrchestrationResponse orchestrationResponse) {
+
+        payment.setStatus(
+                PaymentStatus.valueOf(orchestrationResponse.getStatus())
+        );
+
+        paymentRepository.save(payment);
     }
 
     private PaymentResponse handleExistingRecord(
