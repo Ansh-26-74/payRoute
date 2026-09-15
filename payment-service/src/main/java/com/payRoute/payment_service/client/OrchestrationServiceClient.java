@@ -5,6 +5,7 @@ import com.payRoute.payment_service.dto.response.OrchestrationResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Component
 public class OrchestrationServiceClient {
@@ -20,12 +21,20 @@ public class OrchestrationServiceClient {
     public OrchestrationResponse orchestrate(
             OrchestratePaymentRequest request) {
 
-        return restClientBuilder
-                .build()
-                .post()
-                .uri("http://orchestration-service/orchestrate")
-                .body(request)
-                .retrieve()
-                .body(OrchestrationResponse.class);
+        try {
+            return restClientBuilder
+                    .build()
+                    .post()
+                    .uri("http://orchestration-service/orchestrate")
+                    .body(request)
+                    .retrieve()
+                    .body(OrchestrationResponse.class);
+
+        } catch (IllegalStateException ex) {
+            throw new RestClientException(
+                    "Orchestration service is unavailable",
+                    ex
+            );
+        }
     }
 }

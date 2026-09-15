@@ -1,6 +1,8 @@
 package com.payRoute.payment_service.service;
 
+import com.payRoute.payment_service.client.OrchestrationServiceClient;
 import com.payRoute.payment_service.dto.request.CreatePaymentRequest;
+import com.payRoute.payment_service.dto.request.OrchestratePaymentRequest;
 import com.payRoute.payment_service.dto.response.OrchestrationResponse;
 import com.payRoute.payment_service.dto.response.PaymentResponse;
 import com.payRoute.payment_service.entity.IdempotencyRecord;
@@ -13,8 +15,7 @@ import com.payRoute.payment_service.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import com.payRoute.payment_service.client.OrchestrationServiceClient;
-import com.payRoute.payment_service.dto.request.OrchestratePaymentRequest;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -95,6 +96,9 @@ public class PaymentService {
                     requestHash
             );
 
+            payment.setStatus(PaymentStatus.PROCESSING);
+            paymentRepository.save(payment);
+
             OrchestrationResponse orchestrationResponse =
                     orchestrationServiceClient.orchestrate(
                             OrchestratePaymentRequest.builder()
@@ -117,6 +121,15 @@ public class PaymentService {
             );
 
             return response;
+
+        } catch (RestClientException ex) {
+
+            Payment payment = findPaymentByIdempotencyKey(
+                    request.getMerchantId(),
+                    idempotencyKey
+            );
+
+            return toPaymentResponse(payment);
 
         } catch (DataIntegrityViolationException ex) {
 
@@ -149,9 +162,14 @@ public class PaymentService {
             Payment payment,
             OrchestrationResponse orchestrationResponse) {
 
-        payment.setStatus(
-                PaymentStatus.valueOf(orchestrationResponse.getStatus())
-        );
+        switch (orchestrationResponse.getStatus()) {
+            case "SUCCESS" -> payment.setStatus(PaymentStatus.SUCCESS);
+            case "FAILED" -> payment.setStatus(PaymentStatus.FAILED);
+            default -> throw new IllegalStateException(
+                    "Unsupported orchestration status: "
+                            + orchestrationResponse.getStatus()
+            );
+        }
 
         paymentRepository.save(payment);
     }
@@ -173,6 +191,27 @@ public class PaymentService {
                 ));
 
         return toPaymentResponse(payment);
+    }
+
+    private Payment findPaymentByIdempotencyKey(
+            UUID merchantId,
+            String idempotencyKey) {
+
+        IdempotencyRecord record =
+                idempotencyRecordRepository
+                        .findByMerchantIdAndIdempotencyKey(
+                                merchantId,
+                                idempotencyKey
+                        )
+                        .orElseThrow(() -> new IllegalStateException(
+                                "Payment associated with idempotency key was not found"
+                        ));
+
+        return paymentRepository
+                .findById(record.getPaymentId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Payment associated with idempotency record was not found"
+                ));
     }
 
     private PaymentResponse toPaymentResponse(Payment payment) {
