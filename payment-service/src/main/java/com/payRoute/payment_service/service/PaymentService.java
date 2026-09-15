@@ -5,13 +5,17 @@ import com.payRoute.payment_service.dto.response.PaymentResponse;
 import com.payRoute.payment_service.entity.IdempotencyRecord;
 import com.payRoute.payment_service.entity.Payment;
 import com.payRoute.payment_service.exception.IdempotencyKeyConflictException;
+import com.payRoute.payment_service.exception.ResourceNotFoundException;
 import com.payRoute.payment_service.repository.IdempotencyRecordRepository;
 import com.payRoute.payment_service.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import com.payRoute.payment_service.client.OrchestrationServiceClient;
+import com.payRoute.payment_service.dto.request.OrchestratePaymentRequest;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,7 @@ public class PaymentService {
     private final RequestHashService requestHashService;
     private final PaymentCreationService paymentCreationService;
     private final IdempotencyCacheService idempotencyCacheService;
+    private final OrchestrationServiceClient orchestrationServiceClient;
 
     public PaymentResponse createPayment(
             CreatePaymentRequest request,
@@ -90,6 +95,15 @@ public class PaymentService {
 
             PaymentResponse response = toPaymentResponse(payment);
 
+            orchestrationServiceClient.orchestrate(
+                    OrchestratePaymentRequest.builder()
+                            .paymentId(payment.getPaymentId())
+                            .merchantId(payment.getMerchantId())
+                            .amount(payment.getAmount())
+                            .currency(payment.getCurrency())
+                            .build()
+            );
+
             idempotencyCacheService.put(
                     request.getMerchantId(),
                     idempotencyKey,
@@ -156,5 +170,21 @@ public class PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    public PaymentResponse getPayment(UUID paymentId, UUID merchantId) {
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Payment not found"
+                ));
+
+        if (!payment.getMerchantId().equals(merchantId)) {
+            throw new ResourceNotFoundException(
+                    "Payment not found"
+            );
+        }
+
+        return toPaymentResponse(payment);
     }
 }

@@ -1,4 +1,4 @@
-package com.payroute.orchestration_service.dto.request;
+package com.payRoute.payment_service.dto.request;
 
 import lombok.*;
 
@@ -9,6 +9,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class OrchestratePaymentRequest {
     private UUID paymentId;
     private UUID merchantId;
