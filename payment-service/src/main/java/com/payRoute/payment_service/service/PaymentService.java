@@ -175,6 +175,13 @@ public class PaymentService {
                 );
             }
 
+            case "DECLINED" -> {
+                payment.setStatus(PaymentStatus.DECLINED);
+                payment.setFailureReason(
+                        orchestrationResponse.getDeclineReason()
+                );
+            }
+
             default -> throw new IllegalStateException(
                     "Unsupported orchestration status: "
                             + orchestrationResponse.getStatus()
