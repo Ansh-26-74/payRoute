@@ -163,8 +163,18 @@ public class PaymentService {
             OrchestrationResponse orchestrationResponse) {
 
         switch (orchestrationResponse.getStatus()) {
-            case "SUCCESS" -> payment.setStatus(PaymentStatus.SUCCESS);
-            case "FAILED" -> payment.setStatus(PaymentStatus.FAILED);
+            case "SUCCESS" -> {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                payment.setFailureReason(null);
+            }
+
+            case "FAILED" -> {
+                payment.setStatus(PaymentStatus.FAILED);
+                payment.setFailureReason(
+                        orchestrationResponse.getDeclineReason()
+                );
+            }
+
             default -> throw new IllegalStateException(
                     "Unsupported orchestration status: "
                             + orchestrationResponse.getStatus()
@@ -222,6 +232,7 @@ public class PaymentService {
                 .amount(payment.getAmount())
                 .currency(payment.getCurrency())
                 .status(payment.getStatus())
+                .failureReason(payment.getFailureReason())
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();

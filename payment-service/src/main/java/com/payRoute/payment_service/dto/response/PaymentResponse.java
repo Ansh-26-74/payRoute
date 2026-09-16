@@ -25,6 +25,8 @@ public class PaymentResponse {
 
     private PaymentStatus status;
 
+    private String failureReason;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
