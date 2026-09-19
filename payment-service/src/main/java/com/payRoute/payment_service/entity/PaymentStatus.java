@@ -7,4 +7,5 @@ public enum PaymentStatus {
     SUCCESS,
     DECLINED,
     FAILED
+
 }
