@@ -6,6 +6,8 @@ public interface PaymentGateway {
 
     GatewayResponse charge(OrchestratePaymentRequest request);
 
+    String gatewayId();
+
     record GatewayResponse(
             String status,
             String declineReason

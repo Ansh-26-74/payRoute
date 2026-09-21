@@ -1,8 +1,8 @@
 package com.payroute.orchestration_service.service;
 
-import com.payroute.orchestration_service.client.SimGatewayClient;
 import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 import com.payroute.orchestration_service.dto.response.OrchestrationResponse;
+import com.payroute.orchestration_service.gateway.PaymentGateway;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OrchestrationService {
 
-    private final SimGatewayClient simGatewayClient;
+    private final PaymentGateway paymentGateway;
     private final PaymentAttemptService paymentAttemptService;
 
     public OrchestrationResponse orchestrate(
@@ -18,14 +18,14 @@ public class OrchestrationService {
 
         long startTime = System.currentTimeMillis();
 
-        SimGatewayClient.SimGatewayResponse gatewayResponse =
-                simGatewayClient.charge(request);
+        PaymentGateway.GatewayResponse gatewayResponse =
+                paymentGateway.charge(request);
 
         long latencyMs = System.currentTimeMillis() - startTime;
 
         paymentAttemptService.recordAttempt(
                 request.getPaymentId(),
-                "SIM_GATEWAY",
+                paymentGateway.gatewayId(),
                 gatewayResponse.status(),
                 gatewayResponse.declineReason(),
                 latencyMs
