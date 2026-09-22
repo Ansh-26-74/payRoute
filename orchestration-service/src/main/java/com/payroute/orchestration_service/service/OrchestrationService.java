@@ -3,6 +3,8 @@ package com.payroute.orchestration_service.service;
 import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 import com.payroute.orchestration_service.dto.response.OrchestrationResponse;
 import com.payroute.orchestration_service.gateway.PaymentGateway;
+import com.payroute.orchestration_service.gateway.PaymentGatewayRegistry;
+import com.payroute.orchestration_service.routing.GatewayRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,22 +12,28 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OrchestrationService {
 
-    private final PaymentGateway paymentGateway;
+    private final PaymentGatewayRegistry paymentGatewayRegistry;
     private final PaymentAttemptService paymentAttemptService;
+    private final GatewayRouter gatewayRouter;
 
     public OrchestrationResponse orchestrate(
             OrchestratePaymentRequest request) {
 
         long startTime = System.currentTimeMillis();
 
+        String gatewayId = gatewayRouter.selectGateway(request);
+
+        PaymentGateway gateway =
+                paymentGatewayRegistry.getGateway(gatewayId);
+
         PaymentGateway.GatewayResponse gatewayResponse =
-                paymentGateway.charge(request);
+                gateway.charge(request);
 
         long latencyMs = System.currentTimeMillis() - startTime;
 
         paymentAttemptService.recordAttempt(
                 request.getPaymentId(),
-                paymentGateway.gatewayId(),
+                gateway.gatewayId(),
                 gatewayResponse.status(),
                 gatewayResponse.declineReason(),
                 latencyMs
@@ -34,7 +42,7 @@ public class OrchestrationService {
         return OrchestrationResponse.builder()
                 .paymentId(request.getPaymentId())
                 .status(gatewayResponse.status())
-                .gatewayUsed("SIM_GATEWAY")
+                .gatewayUsed(gateway.gatewayId())
                 .declineReason(gatewayResponse.declineReason())
                 .build();
     }

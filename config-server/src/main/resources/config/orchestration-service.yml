@@ -36,3 +36,11 @@ eureka:
   instance:
     hostname: localhost
     prefer-ip-address: false
+
+payment:
+  gateway:
+    enabled:
+      - SIM_GATEWAY
+    routing:
+      minimum-success-rate: 0.80
+      minimum-attempts: 5
