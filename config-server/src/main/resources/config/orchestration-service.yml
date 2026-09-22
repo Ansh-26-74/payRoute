@@ -16,6 +16,11 @@ spring:
       hibernate:
         format_sql: true
 
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6380
+
 server:
   port: 8084
 
@@ -41,6 +46,8 @@ payment:
   gateway:
     enabled:
       - SIM_GATEWAY
-    routing:
-      minimum-success-rate: 0.80
-      minimum-attempts: 5
+    minimum-success-rate: 0.80
+    minimum-attempts: 5
+    recovery:
+      cooldown-seconds: 300
+      probe-attempts: 5

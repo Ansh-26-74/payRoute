@@ -4,5 +4,12 @@ import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 
 public interface GatewayRouter {
 
-    String selectGateway(OrchestratePaymentRequest request);
+    GatewaySelection selectGateway(
+            OrchestratePaymentRequest request
+    );
+
+    record GatewaySelection(
+            String gatewayId,
+            boolean recoveryProbe
+    ) {}
 }

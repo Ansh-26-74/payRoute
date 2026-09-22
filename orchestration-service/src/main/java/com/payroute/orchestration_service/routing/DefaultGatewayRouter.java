@@ -4,6 +4,7 @@ import com.payroute.orchestration_service.config.GatewayRoutingProperties;
 import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 import com.payroute.orchestration_service.gateway.GatewayPerformance;
 import com.payroute.orchestration_service.service.GatewayPerformanceService;
+import com.payroute.orchestration_service.service.GatewayRecoveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,9 +16,11 @@ public class DefaultGatewayRouter implements GatewayRouter {
 
     private final GatewayRoutingProperties gatewayRoutingProperties;
     private final GatewayPerformanceService gatewayPerformanceService;
+    private final GatewayRecoveryService gatewayRecoveryService;
 
     @Override
-    public String selectGateway(OrchestratePaymentRequest request) {
+    public GatewaySelection selectGateway(
+            OrchestratePaymentRequest request) {
 
         List<String> enabledGateways =
                 gatewayRoutingProperties.getEnabled();
@@ -31,24 +34,61 @@ public class DefaultGatewayRouter implements GatewayRouter {
         double minimumSuccessRate =
                 gatewayRoutingProperties.getMinimumSuccessRate();
 
-        List<GatewayPerformance> eligibleGateways =
+        int probeAttempts =
+                gatewayRoutingProperties
+                        .getRecovery()
+                        .getProbeAttempts();
+
+        List<GatewayPerformance> performances =
                 gatewayPerformanceService
-                        .getPerformanceForGateways(enabledGateways)
-                        .stream()
-                        .filter(performance -> isEligible(
-                                performance,
-                                minimumSuccessRate
-                        ))
+                        .getPerformanceForGateways(enabledGateways);
+
+        for (GatewayPerformance performance : performances) {
+
+            if (gatewayRecoveryService.isInCooldown(
+                    performance.gatewayId())) {
+                continue;
+            }
+
+            if (isEligible(
+                    performance,
+                    minimumSuccessRate)) {
+                continue;
+            }
+
+            boolean probeReserved =
+                    gatewayRecoveryService.tryReserveProbeAttempt(
+                            performance.gatewayId(),
+                            probeAttempts
+                    );
+
+            if (probeReserved) {
+                return new GatewaySelection(
+                        performance.gatewayId(),
+                        true
+                );
+            }
+        }
+
+        List<GatewayPerformance> healthyGateways =
+                performances.stream()
+                        .filter(performance ->
+                                !gatewayRecoveryService.isInCooldown(
+                                        performance.gatewayId()))
+                        .filter(performance ->
+                                isEligible(
+                                        performance,
+                                        minimumSuccessRate))
                         .toList();
 
-        if (eligibleGateways.isEmpty()) {
+        if (healthyGateways.isEmpty()) {
             throw new IllegalStateException(
                     "No eligible payment gateways available"
             );
         }
 
         List<GatewayPerformance> gatewaysWithEnoughHistory =
-                eligibleGateways.stream()
+                healthyGateways.stream()
                         .filter(performance ->
                                 performance.totalAttempts()
                                         >= gatewayRoutingProperties
@@ -56,27 +96,39 @@ public class DefaultGatewayRouter implements GatewayRouter {
                         .toList();
 
         if (!gatewaysWithEnoughHistory.isEmpty()) {
-            return gatewaysWithEnoughHistory.stream()
-                    .min((first, second) ->
-                            Double.compare(
-                                    first.averageLatencyMs().orElse(Double.MAX_VALUE),
-                                    second.averageLatencyMs().orElse(Double.MAX_VALUE)
-                            ))
-                    .map(GatewayPerformance::gatewayId)
-                    .orElseThrow();
+
+            String selectedGatewayId =
+                    gatewaysWithEnoughHistory.stream()
+                            .min((first, second) ->
+                                    Double.compare(
+                                            first.averageLatencyMs()
+                                                    .orElse(Double.MAX_VALUE),
+                                            second.averageLatencyMs()
+                                                    .orElse(Double.MAX_VALUE)
+                                    ))
+                            .map(GatewayPerformance::gatewayId)
+                            .orElseThrow();
+
+            return new GatewaySelection(
+                    selectedGatewayId,
+                    false
+            );
         }
 
-        return eligibleGateways.stream()
-                .min((first, second) ->
-                        Long.compare(
-                                first.totalAttempts(),
-                                second.totalAttempts()
-                        ))
-                .map(GatewayPerformance::gatewayId)
-                .orElseThrow(() ->
-                        new IllegalStateException(
-                                "No eligible payment gateways available"
-                        ));
+        String selectedGatewayId =
+                healthyGateways.stream()
+                        .min((first, second) ->
+                                Long.compare(
+                                        first.totalAttempts(),
+                                        second.totalAttempts()
+                                ))
+                        .map(GatewayPerformance::gatewayId)
+                        .orElseThrow();
+
+        return new GatewaySelection(
+                selectedGatewayId,
+                false
+        );
     }
 
     private boolean isEligible(

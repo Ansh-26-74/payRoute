@@ -18,4 +18,15 @@ public class GatewayRoutingProperties {
     private double minimumSuccessRate = 0.80;
 
     private int minimumAttempts = 5;
+
+    private Recovery recovery = new Recovery();
+
+    @Getter
+    @Setter
+    public static class Recovery {
+
+        private long cooldownSeconds = 300;
+
+        private int probeAttempts = 5;
+    }
 }
