@@ -3,7 +3,8 @@ package com.payroute.orchestration_service.routing;
 import com.payroute.orchestration_service.config.GatewayRoutingProperties;
 import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 import com.payroute.orchestration_service.gateway.GatewayPerformance;
-import com.payroute.orchestration_service.service.GatewayPerformanceService;
+import com.payroute.orchestration_service.service.GatewayExplorationService;
+import com.payroute.orchestration_service.service.GatewayPerformanceCache;
 import com.payroute.orchestration_service.service.GatewayRecoveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,9 @@ import java.util.List;
 public class DefaultGatewayRouter implements GatewayRouter {
 
     private final GatewayRoutingProperties gatewayRoutingProperties;
-    private final GatewayPerformanceService gatewayPerformanceService;
+    private final GatewayPerformanceCache gatewayPerformanceCache;
     private final GatewayRecoveryService gatewayRecoveryService;
+    private final GatewayExplorationService gatewayExplorationService;
 
     @Override
     public GatewaySelection selectGateway(
@@ -40,8 +42,9 @@ public class DefaultGatewayRouter implements GatewayRouter {
                         .getProbeAttempts();
 
         List<GatewayPerformance> performances =
-                gatewayPerformanceService
-                        .getPerformanceForGateways(enabledGateways);
+                enabledGateways.stream()
+                        .map(gatewayPerformanceCache::getRecentPerformance)
+                        .toList();
 
         for (GatewayPerformance performance : performances) {
 
@@ -65,7 +68,8 @@ public class DefaultGatewayRouter implements GatewayRouter {
             if (probeReserved) {
                 return new GatewaySelection(
                         performance.gatewayId(),
-                        true
+                        true,
+                        false
                 );
             }
         }
@@ -87,30 +91,62 @@ public class DefaultGatewayRouter implements GatewayRouter {
             );
         }
 
-        List<GatewayPerformance> gatewaysWithEnoughHistory =
+        if (healthyGateways.size() > 1) {
+
+            int explorationInterval =
+                    gatewayRoutingProperties
+                            .getExploration()
+                            .getInterval();
+
+            boolean explorationDue =
+                    gatewayExplorationService
+                            .isExplorationDue(explorationInterval);
+
+            if (explorationDue) {
+
+                String explorationGateway =
+                        gatewayExplorationService
+                                .getLeastRecentlyExploredGateway(
+                                        healthyGateways.stream()
+                                                .map(GatewayPerformance::gatewayId)
+                                                .toList()
+                                );
+
+                if (explorationGateway != null) {
+                    return new GatewaySelection(
+                            explorationGateway,
+                            false,
+                            true
+                    );
+                }
+            }
+        }
+
+        int minimumAttempts =
+                gatewayRoutingProperties.getMinimumAttempts();
+
+        List<GatewayPerformance> gatewaysWithoutEnoughHistory =
                 healthyGateways.stream()
                         .filter(performance ->
                                 performance.totalAttempts()
-                                        >= gatewayRoutingProperties
-                                        .getMinimumAttempts())
+                                        < minimumAttempts)
                         .toList();
 
-        if (!gatewaysWithEnoughHistory.isEmpty()) {
+        if (!gatewaysWithoutEnoughHistory.isEmpty()) {
 
             String selectedGatewayId =
-                    gatewaysWithEnoughHistory.stream()
+                    gatewaysWithoutEnoughHistory.stream()
                             .min((first, second) ->
-                                    Double.compare(
-                                            first.averageLatencyMs()
-                                                    .orElse(Double.MAX_VALUE),
-                                            second.averageLatencyMs()
-                                                    .orElse(Double.MAX_VALUE)
+                                    Long.compare(
+                                            first.totalAttempts(),
+                                            second.totalAttempts()
                                     ))
                             .map(GatewayPerformance::gatewayId)
                             .orElseThrow();
 
             return new GatewaySelection(
                     selectedGatewayId,
+                    false,
                     false
             );
         }
@@ -118,15 +154,18 @@ public class DefaultGatewayRouter implements GatewayRouter {
         String selectedGatewayId =
                 healthyGateways.stream()
                         .min((first, second) ->
-                                Long.compare(
-                                        first.totalAttempts(),
-                                        second.totalAttempts()
+                                Double.compare(
+                                        first.averageLatencyMs()
+                                                .orElse(Double.MAX_VALUE),
+                                        second.averageLatencyMs()
+                                                .orElse(Double.MAX_VALUE)
                                 ))
                         .map(GatewayPerformance::gatewayId)
                         .orElseThrow();
 
         return new GatewaySelection(
                 selectedGatewayId,
+                false,
                 false
         );
     }

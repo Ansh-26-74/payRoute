@@ -20,11 +20,10 @@ public class OrchestrationService {
     private final GatewayRouter gatewayRouter;
     private final GatewayRecoveryService gatewayRecoveryService;
     private final GatewayRoutingProperties gatewayRoutingProperties;
+    private final GatewayExplorationService gatewayExplorationService;
 
     public OrchestrationResponse orchestrate(
             OrchestratePaymentRequest request) {
-
-        long startTime = System.currentTimeMillis();
 
         GatewayRouter.GatewaySelection selection =
                 gatewayRouter.selectGateway(request);
@@ -33,6 +32,8 @@ public class OrchestrationService {
 
         PaymentGateway gateway =
                 paymentGatewayRegistry.getGateway(gatewayId);
+
+        long startTime = System.currentTimeMillis();
 
         PaymentGateway.GatewayResponse gatewayResponse =
                 gateway.charge(request);
@@ -68,6 +69,10 @@ public class OrchestrationService {
                                     .getCooldownSeconds()
                     )
             );
+        }
+
+        if (selection.exploration()) {
+            gatewayExplorationService.recordExploration(gatewayId);
         }
 
         return OrchestrationResponse.builder()

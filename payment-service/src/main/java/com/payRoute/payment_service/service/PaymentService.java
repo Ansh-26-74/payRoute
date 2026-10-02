@@ -198,7 +198,7 @@ public class PaymentService {
         if (!record.getRequestHash().equals(requestHash)) {
             throw new IdempotencyKeyConflictException(
                     "Idempotency key was already used with a different request"
-            );
+            );  
         }
 
         Payment payment = paymentRepository

@@ -10,6 +10,7 @@ public interface GatewayRouter {
 
     record GatewaySelection(
             String gatewayId,
-            boolean recoveryProbe
+            boolean recoveryProbe,
+            boolean exploration
     ) {}
 }

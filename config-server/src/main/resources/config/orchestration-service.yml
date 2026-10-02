@@ -46,8 +46,11 @@ payment:
   gateway:
     enabled:
       - SIM_GATEWAY
+      - BANK_GATEWAY
     minimum-success-rate: 0.80
     minimum-attempts: 5
+    exploration:
+      interval: 10
     recovery:
       cooldown-seconds: 300
       probe-attempts: 5

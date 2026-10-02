@@ -13,6 +13,8 @@ import java.util.UUID;
 public class PaymentAttemptService {
 
     private final PaymentAttemptRepository paymentAttemptRepository;
+    private final GatewayPerformanceCache gatewayPerformanceCache;
+
     public PaymentAttempt recordAttempt(
             UUID paymentId,
             String gatewayId,
@@ -41,7 +43,17 @@ public class PaymentAttemptService {
                     .build();
 
             try {
-                return paymentAttemptRepository.saveAndFlush(paymentAttempt);
+                PaymentAttempt savedAttempt =
+                        paymentAttemptRepository.saveAndFlush(paymentAttempt);
+
+                gatewayPerformanceCache.recordAttempt(
+                        savedAttempt.getGatewayId(),
+                        savedAttempt.getStatus(),
+                        savedAttempt.getLatencyMs()
+                );
+
+                return savedAttempt;
+
             } catch (DataIntegrityViolationException ex) {
                 if (attempt == 2) {
                     throw ex;

@@ -19,7 +19,16 @@ public class GatewayRoutingProperties {
 
     private int minimumAttempts = 5;
 
+    private Exploration exploration = new Exploration();
+
     private Recovery recovery = new Recovery();
+
+    @Getter
+    @Setter
+    public static class Exploration {
+
+        private int interval = 10;
+    }
 
     @Getter
     @Setter
