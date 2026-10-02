@@ -36,6 +36,20 @@ public class GatewayExplorationService {
             return null;
         }
 
+        for (String gatewayId : gatewayIds) {
+
+            Double score =
+                    redisTemplate.opsForZSet()
+                            .score(
+                                    LAST_EXPLORED_KEY,
+                                    gatewayId
+                            );
+
+            if (score == null) {
+                return gatewayId;
+            }
+        }
+
         Set<String> leastRecentlyExplored =
                 redisTemplate.opsForZSet()
                         .range(
