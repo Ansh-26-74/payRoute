@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.UUID;
+
 @Component
 public class SimGatewayClient {
 
@@ -27,7 +29,25 @@ public class SimGatewayClient {
                 .body(SimGatewayResponse.class);
     }
 
+    public SimGatewayStatusResponse checkStatus(UUID paymentId) {
+
+        return restClientBuilder.build()
+                .get()
+                .uri(
+                        "http://sim-gateway-service/payments/{paymentId}/status",
+                        paymentId
+                )
+                .retrieve()
+                .body(SimGatewayStatusResponse.class);
+    }
+
     public record SimGatewayResponse(
+            String status,
+            String declineReason
+    ) {
+    }
+
+    public record SimGatewayStatusResponse(
             String status,
             String declineReason
     ) {

@@ -8,19 +8,30 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
-@RequestMapping("/charge")
 @RequiredArgsConstructor
 public class SimGatewayController {
 
     private final SimGatewayService simGatewayService;
 
-    @PostMapping
+    @PostMapping("/charge")
     public ResponseEntity<ChargeResponse> charge(
             @Valid @RequestBody ChargeRequest request) {
 
-        ChargeResponse response = simGatewayService.charge(request);
+        ChargeResponse response =
+                simGatewayService.charge(request);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/payments/{paymentId}/status")
+    public ResponseEntity<ChargeResponse> checkStatus(
+            @PathVariable UUID paymentId) {
+
+        return ResponseEntity.ok(
+                simGatewayService.checkStatus(paymentId)
+        );
     }
 }

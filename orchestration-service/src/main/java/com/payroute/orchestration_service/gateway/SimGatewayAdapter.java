@@ -5,6 +5,8 @@ import com.payroute.orchestration_service.dto.request.OrchestratePaymentRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 public class SimGatewayAdapter implements PaymentGateway {
@@ -23,6 +25,18 @@ public class SimGatewayAdapter implements PaymentGateway {
                 simGatewayClient.charge(request);
 
         return new GatewayResponse(
+                response.status(),
+                response.declineReason()
+        );
+    }
+
+    @Override
+    public GatewayStatusResponse checkStatus(UUID paymentId) {
+
+        SimGatewayClient.SimGatewayStatusResponse response =
+                simGatewayClient.checkStatus(paymentId);
+
+        return new GatewayStatusResponse(
                 response.status(),
                 response.declineReason()
         );

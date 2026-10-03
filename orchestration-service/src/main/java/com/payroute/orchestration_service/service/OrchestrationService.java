@@ -8,8 +8,11 @@ import com.payroute.orchestration_service.gateway.PaymentGatewayRegistry;
 import com.payroute.orchestration_service.routing.GatewayRouter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,61 +28,142 @@ public class OrchestrationService {
     public OrchestrationResponse orchestrate(
             OrchestratePaymentRequest request) {
 
-        GatewayRouter.GatewaySelection selection =
-                gatewayRouter.selectGateway(request);
+        Set<String> excludedGateways = new HashSet<>();
 
-        String gatewayId = selection.gatewayId();
+        for (int attempt = 0; attempt < 2; attempt++) {
 
-        PaymentGateway gateway =
-                paymentGatewayRegistry.getGateway(gatewayId);
+            GatewayRouter.GatewaySelection selection =
+                    gatewayRouter.selectGateway(
+                            request,
+                            excludedGateways
+                    );
 
-        long startTime = System.currentTimeMillis();
+            String gatewayId = selection.gatewayId();
 
-        PaymentGateway.GatewayResponse gatewayResponse =
-                gateway.charge(request);
+            PaymentGateway gateway =
+                    paymentGatewayRegistry.getGateway(gatewayId);
 
-        long latencyMs =
-                System.currentTimeMillis() - startTime;
+            long startTime = System.currentTimeMillis();
 
-        paymentAttemptService.recordAttempt(
-                request.getPaymentId(),
-                gateway.gatewayId(),
-                gatewayResponse.status(),
-                gatewayResponse.declineReason(),
-                latencyMs
-        );
+            try {
 
-        if (selection.recoveryProbe()) {
+                PaymentGateway.GatewayResponse gatewayResponse =
+                        gateway.charge(request);
 
-            boolean success =
-                    "SUCCESS".equalsIgnoreCase(
-                            gatewayResponse.status());
+                long latencyMs =
+                        System.currentTimeMillis() - startTime;
 
-            gatewayRecoveryService.completeProbe(
-                    gatewayId,
-                    success,
-                    gatewayRoutingProperties
-                            .getMinimumSuccessRate(),
-                    gatewayRoutingProperties
-                            .getRecovery()
-                            .getProbeAttempts(),
-                    Duration.ofSeconds(
+                paymentAttemptService.recordAttempt(
+                        request.getPaymentId(),
+                        gateway.gatewayId(),
+                        gatewayResponse.status(),
+                        gatewayResponse.declineReason(),
+                        latencyMs
+                );
+
+                if (selection.recoveryProbe()) {
+
+                    boolean success =
+                            "SUCCESS".equalsIgnoreCase(
+                                    gatewayResponse.status());
+
+                    gatewayRecoveryService.completeProbe(
+                            gatewayId,
+                            success,
+                            gatewayRoutingProperties
+                                    .getMinimumSuccessRate(),
                             gatewayRoutingProperties
                                     .getRecovery()
-                                    .getCooldownSeconds()
-                    )
-            );
-        }
+                                    .getProbeAttempts(),
+                            Duration.ofSeconds(
+                                    gatewayRoutingProperties
+                                            .getRecovery()
+                                            .getCooldownSeconds()
+                            )
+                    );
+                }
 
-        if (selection.exploration()) {
-            gatewayExplorationService.recordExploration(gatewayId);
+                if (selection.exploration()) {
+                    gatewayExplorationService.recordExploration(
+                            gatewayId
+                    );
+                }
+
+                return OrchestrationResponse.builder()
+                        .paymentId(request.getPaymentId())
+                        .status(gatewayResponse.status())
+                        .gatewayUsed(gateway.gatewayId())
+                        .declineReason(gatewayResponse.declineReason())
+                        .build();
+
+            } catch (RestClientException ex) {
+
+                long latencyMs =
+                        System.currentTimeMillis() - startTime;
+
+                paymentAttemptService.recordAttempt(
+                        request.getPaymentId(),
+                        gateway.gatewayId(),
+                        "TIMEOUT",
+                        "Gateway timeout or connection failure",
+                        latencyMs
+                );
+
+                try {
+
+                    PaymentGateway.GatewayStatusResponse statusResponse =
+                            gateway.checkStatus(
+                                    request.getPaymentId()
+                            );
+
+                    String status =
+                            statusResponse.status();
+
+                    if ("SUCCESS".equalsIgnoreCase(status) ||
+                            "PROCESSING".equalsIgnoreCase(status)) {
+
+                        return OrchestrationResponse.builder()
+                                .paymentId(request.getPaymentId())
+                                .status(status)
+                                .gatewayUsed(gateway.gatewayId())
+                                .declineReason(
+                                        statusResponse.declineReason()
+                                )
+                                .build();
+                    }
+
+                    if ("FAILED".equalsIgnoreCase(status) ||
+                            "DECLINED".equalsIgnoreCase(status) ||
+                            "NOT_FOUND".equalsIgnoreCase(status)) {
+
+                        excludedGateways.add(gatewayId);
+                        continue;
+                    }
+
+                    return OrchestrationResponse.builder()
+                            .paymentId(request.getPaymentId())
+                            .status("PROCESSING")
+                            .gatewayUsed(gateway.gatewayId())
+                            .declineReason(null)
+                            .build();
+
+                } catch (RestClientException statusException) {
+
+                    return OrchestrationResponse.builder()
+                            .paymentId(request.getPaymentId())
+                            .status("PROCESSING")
+                            .gatewayUsed(gateway.gatewayId())
+                            .declineReason(null)
+                            .build();
+                }
+            }
         }
 
         return OrchestrationResponse.builder()
                 .paymentId(request.getPaymentId())
-                .status(gatewayResponse.status())
-                .gatewayUsed(gateway.gatewayId())
-                .declineReason(gatewayResponse.declineReason())
+                .status("FAILED")
+                .gatewayUsed(null)
+                .declineReason("All payment gateways failed")
                 .build();
     }
 }

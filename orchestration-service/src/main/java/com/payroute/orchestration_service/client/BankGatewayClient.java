@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.UUID;
+
 @Component
 public class BankGatewayClient {
 
@@ -28,7 +30,25 @@ public class BankGatewayClient {
                 .body(BankGatewayResponse.class);
     }
 
+    public BankGatewayStatusResponse checkStatus(UUID paymentId) {
+
+        return restClientBuilder.build()
+                .get()
+                .uri(
+                        "http://bank-gateway-service/payments/{paymentId}/status",
+                        paymentId
+                )
+                .retrieve()
+                .body(BankGatewayStatusResponse.class);
+    }
+
     public record BankGatewayResponse(
+            String status,
+            String declineReason
+    ) {
+    }
+
+    public record BankGatewayStatusResponse(
             String status,
             String declineReason
     ) {

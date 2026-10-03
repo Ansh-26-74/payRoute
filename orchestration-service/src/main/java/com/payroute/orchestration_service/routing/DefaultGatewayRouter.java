@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -24,8 +25,20 @@ public class DefaultGatewayRouter implements GatewayRouter {
     public GatewaySelection selectGateway(
             OrchestratePaymentRequest request) {
 
+        return selectGateway(request, Set.of());
+    }
+
+    @Override
+    public GatewaySelection selectGateway(
+            OrchestratePaymentRequest request,
+            Set<String> excludedGateways) {
+
         List<String> enabledGateways =
-                gatewayRoutingProperties.getEnabled();
+                gatewayRoutingProperties.getEnabled()
+                        .stream()
+                        .filter(gatewayId ->
+                                !excludedGateways.contains(gatewayId))
+                        .toList();
 
         if (enabledGateways.isEmpty()) {
             throw new IllegalStateException(
@@ -134,15 +147,30 @@ public class DefaultGatewayRouter implements GatewayRouter {
 
         if (!gatewaysWithoutEnoughHistory.isEmpty()) {
 
-            String selectedGatewayId =
+            long minimumAttemptsCount =
                     gatewaysWithoutEnoughHistory.stream()
-                            .min((first, second) ->
-                                    Long.compare(
-                                            first.totalAttempts(),
-                                            second.totalAttempts()
-                                    ))
-                            .map(GatewayPerformance::gatewayId)
+                            .mapToLong(GatewayPerformance::totalAttempts)
+                            .min()
                             .orElseThrow();
+
+            List<GatewayPerformance> leastTestedGateways =
+                    gatewaysWithoutEnoughHistory.stream()
+                            .filter(performance ->
+                                    performance.totalAttempts()
+                                            == minimumAttemptsCount)
+                            .toList();
+
+            String selectedGatewayId =
+                    gatewayExplorationService
+                            .getLeastRecentlySelectedGateway(
+                                    leastTestedGateways.stream()
+                                            .map(GatewayPerformance::gatewayId)
+                                            .toList()
+                            );
+
+            gatewayExplorationService.recordGatewaySelection(
+                    selectedGatewayId
+            );
 
             return new GatewaySelection(
                     selectedGatewayId,

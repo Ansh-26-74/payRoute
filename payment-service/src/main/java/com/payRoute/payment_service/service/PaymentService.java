@@ -129,7 +129,16 @@ public class PaymentService {
                     idempotencyKey
             );
 
-            return toPaymentResponse(payment);
+            PaymentResponse response = toPaymentResponse(payment);
+
+            idempotencyCacheService.put(
+                    request.getMerchantId(),
+                    idempotencyKey,
+                    requestHash,
+                    response
+            );
+
+            return response;
 
         } catch (DataIntegrityViolationException ex) {
 
@@ -180,6 +189,11 @@ public class PaymentService {
                 payment.setFailureReason(
                         orchestrationResponse.getDeclineReason()
                 );
+            }
+
+            case "PROCESSING" -> {
+                payment.setStatus(PaymentStatus.PROCESSING);
+                payment.setFailureReason(null);
             }
 
             default -> throw new IllegalStateException(
