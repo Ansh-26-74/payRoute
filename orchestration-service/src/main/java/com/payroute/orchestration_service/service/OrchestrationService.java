@@ -109,6 +109,23 @@ public class OrchestrationService {
                         latencyMs
                 );
 
+                if (selection.recoveryProbe()) {
+
+                    gatewayRecoveryService.completeProbe(
+                            gatewayId,
+                            false,
+                            gatewayRoutingProperties.getMinimumSuccessRate(),
+                            gatewayRoutingProperties.getRecovery().getProbeAttempts(),
+                            Duration.ofSeconds(
+                                    gatewayRoutingProperties.getRecovery().getCooldownSeconds()
+                            )
+                    );
+                }
+
+                if (selection.exploration()) {
+                    gatewayExplorationService.recordExploration(gatewayId);
+                }
+
                 try {
 
                     PaymentGateway.GatewayStatusResponse statusResponse =
