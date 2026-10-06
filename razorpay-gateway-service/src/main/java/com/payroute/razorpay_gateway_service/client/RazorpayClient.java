@@ -11,4 +11,18 @@ public class RazorpayClient {
     public RazorpayClient(RestClient razorpayRestClient) {
         this.restClient = razorpayRestClient;
     }
+
+    public String createOrder() {
+        return restClient.post()
+                .uri("/v1/orders")
+                .body("""
+                        {
+                            "amount": 50000,
+                            "currency": "INR",
+                            "receipt": "payroute_test_001"
+                        }
+                        """)
+                .retrieve()
+                .body(String.class);
+    }
 }
