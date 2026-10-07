@@ -1,5 +1,6 @@
 package com.payroute.razorpay_gateway_service.client;
 
+import com.payroute.razorpay_gateway_service.dto.request.RazorpayOrderRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -12,16 +13,10 @@ public class RazorpayClient {
         this.restClient = razorpayRestClient;
     }
 
-    public String createOrder() {
+    public String createOrder(RazorpayOrderRequest request) {
         return restClient.post()
                 .uri("/v1/orders")
-                .body("""
-                        {
-                            "amount": 50000,
-                            "currency": "INR",
-                            "receipt": "payroute_test_001"
-                        }
-                        """)
+                .body(request)
                 .retrieve()
                 .body(String.class);
     }
